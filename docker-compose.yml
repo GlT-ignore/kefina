@@ -1,5 +1,7 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.vercel
     ports:
       - "8000:8000"

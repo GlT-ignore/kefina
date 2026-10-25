@@ -68,7 +68,7 @@ web/
   src/format.ts        UK time and number formatting
   src/motion.ts        GSAP and Lenis setup, off under reduced motion
   scripts/prerender.mjs  renders the opening view into dist/index.html at build time
-Dockerfile           stages: Python API, opening-view export, Node web build, final Python image serving both
+Dockerfile.vercel    stages: Python API, opening-view export, Node web build, final Python image serving both
 docker-compose.yml, .github/workflows/ci.yml
 ```
 
@@ -99,6 +99,7 @@ Gates: `epex_0920` (EPEX hourly, default), `n2ex_0950` (N2EX hourly), `epex_1530
 - **Computed at startup.** Building every table takes about 0.3 s after a 0.4 s import (measured), so there is no separate precompute step.
 - **Prerendered opening view.** The build renders 28 January at 09:20 into the HTML with its data, so the page reads with JavaScript off and needs no request before the first paint. Every other view loads from the API.
 - **One image.** FastAPI serves both the API and the built app from one origin, so there is no CORS and one deploy.
+- **One Dockerfile everywhere.** It is named `Dockerfile.vercel` because Vercel builds and runs a file with that name; Compose and CI use the same file, so local, CI and production run the same image.
 
 ## Limits
 
