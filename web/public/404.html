@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Page not found, Readback</title>
+    <meta name="robots" content="noindex" />
+    <meta name="theme-color" content="#070B10" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400&family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&display=swap" />
+    <!-- Served by the API's static files for any unknown path, so it carries its own styles. -->
+    <style>
+      :root { color-scheme: dark; --night: #070b10; --paper: #e9e4d8; --paper-2: rgba(233, 228, 216, 0.74); --rule: rgba(233, 228, 216, 0.15); --dial: #4ccfbb; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: grid;
+        align-content: center;
+        gap: 22px;
+        padding: 48px clamp(16px, 4.5vw, 64px);
+        background: radial-gradient(40% 36% at 62% 32%, rgba(76, 207, 187, 0.12), transparent 70%), var(--night);
+        color: var(--paper);
+        font: 400 17px/1.6 "IBM Plex Sans", system-ui, sans-serif;
+      }
+      p { margin: 0; }
+      .eyebrow { display: flex; align-items: center; gap: 12px; font: 500 12px/1.4 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 0.18em; text-transform: uppercase; color: var(--paper-2); }
+      .eyebrow::before { content: ""; width: 28px; height: 1px; background: var(--dial); }
+      h1 { margin: 0; max-width: 11em; font: 400 clamp(40px, 7vw, 96px)/1.02 "Newsreader", Georgia, serif; letter-spacing: -0.015em; text-wrap: balance; }
+      em { font-style: italic; color: var(--dial); }
+      .lede { max-width: 32em; color: var(--paper-2); }
+      a { justify-self: start; display: inline-flex; align-items: center; min-height: 44px; color: inherit; font: 500 13px/1 "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 0.12em; text-transform: uppercase; text-decoration: none; border-bottom: 1px solid var(--dial); }
+      a:hover { color: var(--dial); }
+      a:focus-visible { outline: 2px solid var(--dial); outline-offset: 3px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <p class="eyebrow">Readback, not found</p>
+    <h1>No bulletin <em>at this address.</em></h1>
+    <p class="lede">The page you asked for is not part of the January 2026 backtest. The day picker and the chart are on the front page.</p>
+    <a href="/">Back to the day picker</a>
+  </body>
+</html>

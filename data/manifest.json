@@ -1,0 +1,22 @@
+{
+  "pulled_at": "2026-10-24T14:32:11+00:00",
+  "source": "https://data.elexon.co.uk/bmrs/api/v1/datasets",
+  "actuals": {
+    "settlement_dates": [
+      "2025-08-31",
+      "2026-02-04"
+    ],
+    "file": "fuelhh_wind.csv.gz",
+    "rows": 7586,
+    "sha256": "f70390ddea97e8335e4bf7a50e33e76c0e16e5348d20c50a2ca97de2d945dd33"
+  },
+  "forecasts": {
+    "publish_dates": [
+      "2025-08-29",
+      "2026-02-02"
+    ],
+    "file": "windfor.csv.gz",
+    "rows": 92296,
+    "sha256": "c9f1ce89d44f63e09bcb56035bc7ea928cb3a010e9fca8fa4414350a6557de69"
+  }
+}

@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" data-view="">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Readback</title>
+    <meta name="description" content="The GB day-ahead wind forecast you had when the auction gate shut, next to metered wind. A backtest of January 2026 decisions." />
+    <meta name="theme-color" content="#070B10" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <script>
+      (function () {
+        var root = document.documentElement;
+        root.classList.add("js");
+        var seen = "1";
+        try { seen = sessionStorage.getItem("readback-intro"); } catch (e) {}
+        if (!seen && !matchMedia("(prefers-reduced-motion: reduce)").matches) root.classList.add("intro");
+        // The prerendered page shows the opening view (data-view); a link to another day or gate shows it as loading until the app has that one.
+        var view = (root.getAttribute("data-view") || "").split(" ");
+        var q = new URLSearchParams(location.search);
+        if (view[1] && ((q.get("day") || view[0]) !== view[0] || (q.get("gate") || view[1]) !== view[1])) root.classList.add("deep-link");
+        // Until the app script arrives, any input or a slow network simply opens the page.
+        var open = function () { if (!window.__app) root.classList.remove("intro"); };
+        ["wheel", "touchstart", "pointerdown", "keydown"].forEach(function (e) { addEventListener(e, open, { once: true, passive: true }); });
+        setTimeout(open, 1500);
+        setTimeout(function () { if (!window.__app) root.classList.remove("js", "intro", "deep-link"); }, 4000);
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;1,400&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" />
+  </head>
+  <body>
+    <div id="root"><!--app--></div>
+    <!--initial-->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

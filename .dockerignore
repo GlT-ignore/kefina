@@ -1,0 +1,10 @@
+.venv
+.git
+**/__pycache__
+.pytest_cache
+.ruff_cache
+tests
+web/node_modules
+web/dist
+web/dist-ssr
+web/prerender-data.json
