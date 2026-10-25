@@ -4,6 +4,8 @@ A pilot for a GB energy supplier's day-ahead desk. It shows the national wind fo
 
 Data: Elexon BMRS, national wind only. Actuals from FUELHH (`fuelType` WIND), forecasts from WINDFOR.
 
+**Live app: https://kefina.vercel.app** (it opens on 28 January at the 09:20 gate, the worst January day).
+
 ## How to start
 
 With Docker (one image serves the app and the API):
