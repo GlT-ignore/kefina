@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { hoursText, monthName, mw, num, pct, ukClock, ukDate, ukDay, ukShortDay, ukTime } from "./format";
 
@@ -14,6 +14,24 @@ describe("UK time labels", () => {
 
   it("shows summer time as BST, an hour ahead of UTC", () => {
     expect(ukTime("2025-10-25T08:20:00Z")).toBe("09:20 BST");
+    expect(ukTime("2025-07-01T23:30:00Z")).toBe("00:30 BST");
+  });
+
+  it("does not depend on the browser's own zone names", () => {
+    // Some browser builds name the UK winter zone "GMT+0" instead of "GMT".
+    const original = Intl.DateTimeFormat.prototype.formatToParts;
+    const spy = vi.spyOn(Intl.DateTimeFormat.prototype, "formatToParts").mockImplementation(function (
+      this: Intl.DateTimeFormat,
+      date?: Date | number,
+    ) {
+      return original.call(this, date).map((p) => (p.type === "timeZoneName" ? { ...p, value: "GMT+0" } : p));
+    });
+    try {
+      expect(ukTime("2026-01-27T09:20:00Z")).toBe("09:20 GMT");
+      expect(ukTime("2025-10-25T08:20:00Z")).toBe("09:20 BST");
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

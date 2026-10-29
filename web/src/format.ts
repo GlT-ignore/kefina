@@ -1,7 +1,6 @@
 const UK = "Europe/London";
 
 const clock = new Intl.DateTimeFormat("en-GB", { timeZone: UK, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-const zone = new Intl.DateTimeFormat("en-GB", { timeZone: UK, timeZoneName: "short" });
 const dayLabel = new Intl.DateTimeFormat("en-GB", { timeZone: UK, weekday: "short", day: "numeric", month: "short" });
 const shortLabel = new Intl.DateTimeFormat("en-GB", { timeZone: UK, day: "numeric", month: "short" });
 const dateLabel = new Intl.DateTimeFormat("en-GB", { timeZone: UK, day: "numeric", month: "short", year: "numeric" });
@@ -11,8 +10,11 @@ const whole = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 /** "09:20 GMT" or "09:20 BST", whatever the viewer's own clock. */
 export function ukTime(iso: string): string {
   const date = new Date(iso);
-  const tz = zone.formatToParts(date).find((p) => p.type === "timeZoneName")?.value ?? "";
-  return `${clock.format(date)} ${tz}`.trim();
+  const wall = clock.format(date);
+  const [h, m] = wall.split(":").map(Number);
+  // Browsers name the UK zones differently ("GMT" or "GMT+0"), so read the offset from the clock instead.
+  const offset = (h * 60 + m - (date.getUTCHours() * 60 + date.getUTCMinutes()) + 1440) % 1440;
+  return `${wall} ${offset === 60 ? "BST" : "GMT"}`;
 }
 
 /** "09:20", UK wall clock. */
