@@ -1,11 +1,19 @@
-import type { Decision, DriftRun } from "../api";
-import { hoursText, num, ukClock, ukDay, ukTime } from "../format";
+import type { Decision } from "../api";
+import { hoursText, mw, ukClock, ukDay, ukTime } from "../format";
 
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+
+const longDayLabel = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", weekday: "long", day: "numeric", month: "long" });
+
+/** "Wednesday 28 January" */
+export function longDay(iso: string): string {
+  return longDayLabel.format(new Date(iso));
+}
 
 export interface DayFacts {
   run: string;
   meanGap: number;
+  meanAbs: number;
   over: number;
   n: number;
   worstIdx: number;
@@ -18,6 +26,7 @@ export function dayFacts(d: Decision): DayFacts {
   return {
     run: d.runs_used[0].publish_time,
     meanGap: mean(errs),
+    meanAbs: mean(errs.map(Math.abs)),
     over: errs.filter((e) => e > 0).length,
     n: errs.length,
     worstIdx: errs.reduce((best, e, i) => (Math.abs(e) > Math.abs(errs[best]) ? i : best), 0),
@@ -42,78 +51,42 @@ export function runLeadMinutes(d: Decision): number {
   return Math.round((Date.parse(d.cutoff) - Date.parse(d.runs_used[0].publish_time)) / 60000);
 }
 
-/** Minutes after midnight on the UK clock. */
-export function minutesOf(iso: string): number {
-  const [h, m] = ukClock(iso).split(":").map(Number);
-  return h * 60 + m;
-}
-
-function byPublish(runs: DriftRun[]): DriftRun[] {
-  return [...runs].sort((a, b) => a.publish_time.localeCompare(b.publish_time));
-}
-
-function runMean(r: DriftRun): number {
-  return mean(r.points.map((p) => p.forecast_mw));
-}
-
-/** Change in the run's mean against the run before it, over the hours both runs cover. */
-export function changeLabel(r: DriftRun, prev: DriftRun | undefined): string {
-  if (!prev) return "first run in the log";
-  const before = new Map(prev.points.map((p) => [p.start_time, p.forecast_mw]));
-  const shared = r.points.filter((p) => before.has(p.start_time));
-  const d = mean(shared.map((p) => p.forecast_mw - (before.get(p.start_time) ?? 0)));
-  return Math.abs(d) < 1 ? `unchanged from ${ukClock(prev.publish_time)}` : `${num(d, true)} MW vs ${ukClock(prev.publish_time)}`;
-}
-
-export interface LogRow {
-  run: DriftRun;
+export interface RunLine {
   time: string;
-  minutes: number;
-  mean: number;
-  change: string;
-  used: boolean;
+  after: boolean;
+  /** The run's forecast for each delivery hour, undefined where the run does not reach that hour. */
+  values: (number | undefined)[];
 }
 
-/** The runs published on the gate day, each with how it moved from the run before it. */
-export function logRows(d: Decision): { before: LogRow[]; after: LogRow[] } {
-  const all = byPublish(d.drift);
-  const gateDay = ukDay(d.cutoff);
-  const used = d.runs_used[0].publish_time;
-  const rows = all
-    .map((run, i) => ({ run, prev: all[i - 1] }))
-    .filter(({ run }) => ukDay(run.publish_time) === gateDay)
-    .map(({ run, prev }) => ({
-      run,
-      time: ukClock(run.publish_time),
-      minutes: minutesOf(run.publish_time),
-      mean: runMean(run),
-      change: changeLabel(run, prev),
-      used: run.publish_time === used,
-    }));
-  return { before: rows.filter((r) => !r.run.after_gate), after: rows.filter((r) => r.run.after_gate) };
+/** Every run published in the two days before delivery, in publish order. */
+export function runLines(d: Decision): RunLine[] {
+  return [...d.drift]
+    .sort((a, b) => a.publish_time.localeCompare(b.publish_time))
+    .map((r) => {
+      const at = new Map(r.points.map((p) => [p.start_time, p.forecast_mw]));
+      return { time: r.publish_time, after: r.after_gate, values: d.hours.map((h) => at.get(h.start_time)) };
+    });
 }
 
-export interface DriftRow {
-  run: DriftRun;
-  value?: number;
-  used: boolean;
+const RANK = ["The worst", "Second worst", "Third worst", "Fourth worst", "Fifth worst"];
+
+/** "The worst January day at 09:20" for rank 0, empty outside the ranked days. */
+export function worstLabel(rank: number, month: string, gateTime: string): string {
+  return rank >= 0 && rank < RANK.length ? `${RANK[rank]} ${month} day at ${gateTime}` : "";
 }
 
-/** Every run's forecast for one delivery hour, in publish order. */
-export function hourDrift(d: Decision, hourIdx: number) {
-  const hour = d.hours[hourIdx];
-  const used = d.runs_used[0].publish_time;
-  const rows: DriftRow[] = byPublish(d.drift).map((run) => ({
-    run,
-    value: run.points.find((p) => p.start_time === hour.start_time)?.forecast_mw,
-    used: run.publish_time === used,
-  }));
-  const pre = rows.filter((r) => !r.run.after_gate && r.value !== undefined).map((r) => r.value as number);
-  return {
-    hour,
-    rows,
-    firstLate: rows.findIndex((r) => r.run.after_gate),
-    preRange: pre.length ? ([Math.min(...pre), Math.max(...pre)] as const) : undefined,
-    usedValue: rows.find((r) => r.used)?.value,
-  };
+/** "04:00 to 05:00 GMT" for the hour starting at `start`. */
+export function hourSpan(start: string): string {
+  return `${ukClock(start)} to ${ukTime(new Date(Date.parse(start) + 3_600_000).toISOString())}`;
+}
+
+/** Where the forecast for one hour went after the gate, from the last run that covers it. */
+export function rollNote(d: Decision, lines: RunLine[], i: number): string {
+  const last = lines.findLast((l) => l.after && l.values[i] !== undefined);
+  const hour = d.hours[i];
+  if (!last) return "";
+  const value = last.values[i] as number;
+  const diff = value - hour.forecast_mw;
+  const moved = Math.round(diff) === 0 ? "had not moved from the run you had" : `had moved to ${mw(value)}, ${mw(Math.abs(diff))} ${diff < 0 ? "below" : "above"} the run you had`;
+  return `By ${ukDay(last.time)}, ${ukClock(last.time)}, the forecast for ${ukClock(hour.start_time)} ${moved}. Metered wind came in at ${mw(hour.actual_mw)}.`;
 }

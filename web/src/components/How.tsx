@@ -3,17 +3,19 @@ import type { ReactNode } from "react";
 interface Props {
   /** The figure it explains, so each disclosure has its own name for screen readers. */
   about: string;
+  label?: string;
   rule: ReactNode;
   period: ReactNode;
   hours: ReactNode;
   formula: ReactNode;
 }
 
-export function How({ about, rule, period, hours, formula }: Props) {
+export function How({ about, label = "How this was computed", rule, period, hours, formula }: Props) {
   return (
     <details className="how">
       <summary>
-        How was this computed<span className="sr">: {about}</span>
+        {label}
+        <span className="sr-only">: {about}</span>
       </summary>
       <dl className="how-body">
         <div>

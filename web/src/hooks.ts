@@ -15,32 +15,20 @@ export function useMedia(query: string): boolean {
 
 export const useMotion = () => useMedia("(prefers-reduced-motion: no-preference)");
 
-export interface Size {
+const onResize = (onChange: () => void) => {
+  addEventListener("resize", onChange);
+  return () => removeEventListener("resize", onChange);
+};
+
+/**
+ * The layout viewport's height, 0 on the server and during hydration so both renders match.
+ * Unlike innerHeight it holds still while a phone's address bar slides in and out.
+ */
+export const useScreenHeight = () => useSyncExternalStore(onResize, () => document.documentElement.clientHeight, () => 0);
+
+interface Size {
   w: number;
   h: number;
-}
-
-/** Keeps the chosen item of a sideways scroller in view without moving the page. The scroller must be positioned, so item offsets are measured from it. */
-export function useCentered(ref: RefObject<HTMLElement | null>, selector: string, key: string, smooth: boolean): void {
-  useLayoutEffect(() => {
-    let live = true;
-    const center = () => {
-      const el = ref.current;
-      const item = el?.querySelector<HTMLElement>(selector);
-      if (!live || !el || !item || el.scrollWidth <= el.clientWidth) return;
-      el.scrollTo({ left: item.offsetLeft - el.clientWidth / 2 + item.offsetWidth / 2, behavior: smooth ? "smooth" : "auto" });
-    };
-    // Web fonts can change the items' widths after the first measure.
-    const afterFonts = async () => {
-      await document.fonts.ready;
-      center();
-    };
-    center();
-    void afterFonts();
-    return () => {
-      live = false;
-    };
-  }, [ref, selector, key, smooth]);
 }
 
 /** The element's rounded content size, starting from a fallback that the server render also uses. */

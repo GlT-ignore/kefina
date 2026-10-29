@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Decision, DriftRun } from "../api";
-import { changeLabel, dayFacts, gateSentence, hourDrift, logRows, minutesOf, runLeadMinutes } from "./decision";
+import { dayFacts, gateSentence, hourSpan, longDay, rollNote, runLeadMinutes, runLines, worstLabel } from "./decision";
 
 const run = (publish: string, values: number[], afterGate = false): DriftRun => ({
   publish_time: publish,
@@ -27,15 +27,16 @@ const decision: Decision = {
   drift: [
     run("2026-01-27T09:30:00Z", [1000, 1000, 1000], true),
     run("2026-01-27T07:30:00Z", [1000, 900, 1200]),
-    run("2026-01-26T22:30:00Z", [1000, 900, 1200]),
-    run("2026-01-27T04:30:00Z", [800, 700]),
+    run("2026-01-27T11:30:00Z", [1000, 900], true),
+    run("2026-01-26T22:30:00Z", [1000, 900]),
   ],
 };
 
 describe("day facts", () => {
-  it("averages the gap and finds the largest hour", () => {
+  it("averages the gap, signed and absolute, and finds the largest hour", () => {
     const f = dayFacts(decision);
     expect(f.meanGap).toBeCloseTo((200 - 100 + 600) / 3);
+    expect(f.meanAbs).toBeCloseTo((200 + 100 + 600) / 3);
     expect(f.over).toBe(2);
     expect(f.worstIdx).toBe(2);
     expect([f.h0, f.h1]).toEqual([16.5, 18.5]);
@@ -52,31 +53,39 @@ describe("day facts", () => {
     const early = { ...decision, runs_used: [{ publish_time: "2026-01-26T22:30:00Z", hours: 3 }] };
     expect(gateSentence(early)).toContain("the 22:30 run of Mon 26 Jan,");
   });
-});
 
-describe("bulletin log", () => {
-  it("compares each run with the one before over shared hours", () => {
-    expect(changeLabel(run("a", [1000, 900]), undefined)).toBe("first run in the log");
-    expect(changeLabel(run("2026-01-27T07:30:00Z", [1000, 900]), run("2026-01-27T04:30:00Z", [1000, 900, 5]))).toBe("unchanged from 04:30");
-    expect(changeLabel(run("2026-01-27T07:30:00Z", [1100, 1000]), run("2026-01-27T04:30:00Z", [1000, 900]))).toBe("+100 MW vs 04:30");
+  it("ranks the worst days in words", () => {
+    expect(worstLabel(0, "January", "09:20")).toBe("The worst January day at 09:20");
+    expect(worstLabel(2, "January", "15:30")).toBe("Third worst January day at 15:30");
+    expect(worstLabel(-1, "January", "09:20")).toBe("");
   });
 
-  it("keeps only gate-day runs, split at the gate", () => {
-    const { before, after } = logRows(decision);
-    expect(before.map((r) => r.time)).toEqual(["04:30", "07:30"]);
-    expect(before.map((r) => r.change)).toEqual(["-200 MW vs 22:30", "+200 MW vs 04:30"]);
-    expect(before[1].used).toBe(true);
-    expect(after.map((r) => [r.time, r.change])).toEqual([["09:30", "-33 MW vs 07:30"]]);
-    expect(minutesOf("2026-01-27T09:20:00Z")).toBe(560);
+  it("names the delivery day in full", () => {
+    expect(longDay("2026-01-28")).toBe("Wednesday 28 January");
+  });
+
+  it("spans an hour on the UK clock", () => {
+    expect(hourSpan("2026-01-28T04:00:00Z")).toBe("04:00 to 05:00 GMT");
+    expect(hourSpan("2026-01-28T23:00:00Z")).toBe("23:00 to 00:00 GMT");
   });
 });
 
-describe("drift for one hour", () => {
-  it("lists every run in publish order with the pre-gate range", () => {
-    const d = hourDrift(decision, 2);
-    expect(d.rows.map((r) => r.value)).toEqual([1200, undefined, 1200, 1000]);
-    expect(d.firstLate).toBe(3);
-    expect(d.preRange).toEqual([1200, 1200]);
-    expect(d.usedValue).toBe(1200);
+describe("runs", () => {
+  it("lines every run up against the delivery hours, in publish order", () => {
+    const lines = runLines(decision);
+    expect(lines.map((l) => [l.time.slice(11, 16), l.after])).toEqual([
+      ["22:30", false],
+      ["07:30", false],
+      ["09:30", true],
+      ["11:30", true],
+    ]);
+    expect(lines[0].values).toEqual([1000, 900, undefined]);
+  });
+
+  it("says where an hour's forecast went after the gate", () => {
+    const lines = runLines(decision);
+    expect(rollNote(decision, lines, 0)).toBe("By Tue 27 Jan, 11:30, the forecast for 00:00 had not moved from the run you had. Metered wind came in at 800 MW.");
+    expect(rollNote(decision, lines, 2)).toBe("By Tue 27 Jan, 09:30, the forecast for 02:00 had moved to 1,000 MW, 200 MW below the run you had. Metered wind came in at 600 MW.");
+    expect(rollNote(decision, lines.slice(0, 2), 0)).toBe("");
   });
 });
