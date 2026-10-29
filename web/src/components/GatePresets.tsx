@@ -16,15 +16,12 @@ export function GatePresets({ gates, gate, decision, onSelect }: Props) {
   const run = ukClock(decision.runs_used[0].publish_time);
   const closes = gates.find((g) => g.id === decision.gate)?.closes_uk;
   return (
-    <div className="field">
-      <p className="field-label" id="gate-label">
-        Auction gate <span className="hint">GMT, the day before delivery</span>
-      </p>
-      <div className="gates" role="group" aria-labelledby="gate-label">
+    <>
+      <div className="gates" role="group" aria-label="Auction gate, GMT, the day before delivery">
         {gates.map((g) => (
           <button key={g.id} type="button" aria-pressed={g.id === gate} onClick={() => onSelect(g.id)}>
-            <b>{g.closes_uk}</b>
-            <span>{gateName(g)}</span>
+            <span className="g-time">{g.closes_uk}</span>
+            <span className="g-name">{gateName(g)}</span>
           </button>
         ))}
       </div>
@@ -36,6 +33,6 @@ export function GatePresets({ gates, gate, decision, onSelect }: Props) {
           </p>
         </details>
       )}
-    </div>
+    </>
   );
 }

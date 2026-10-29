@@ -1,7 +1,7 @@
-export type Point = readonly [number, number];
+type Scale = (v: number) => number;
 
 /** Maps a domain onto a pixel range. */
-export function linear(d0: number, d1: number, r0: number, r1: number): (v: number) => number {
+export function linear(d0: number, d1: number, r0: number, r1: number): Scale {
   const k = d1 === d0 ? 0 : (r1 - r0) / (d1 - d0);
   return (v) => r0 + (v - d0) * k;
 }
@@ -20,26 +20,29 @@ export function mwAxis(values: number[]): { bottom: number; top: number; ticks: 
   return { bottom, top, ticks };
 }
 
-const xy = ([x, y]: Point) => `${x.toFixed(1)} ${y.toFixed(1)}`;
+const r = (v: number) => v.toFixed(1);
 
-export function linePath(points: Point[]): string {
-  return points.map((p, i) => `${i ? "L" : "M"}${xy(p)}`).join("");
+/** Hourly values as a step line: each value holds flat across its slot. A missing value lifts the pen. */
+export function stepPath(values: (number | undefined)[], x: Scale, y: Scale): string {
+  let d = "";
+  let pen = false;
+  values.forEach((v, i) => {
+    if (v === undefined) {
+      pen = false;
+      return;
+    }
+    d += `${pen ? `V${r(y(v))}` : `M${r(x(i))} ${r(y(v))}`}H${r(x(i + 1))}`;
+    pen = true;
+  });
+  return d;
 }
 
-/** The closed area between two lines that share x positions. */
-export function bandPath(upper: Point[], lower: Point[]): string {
-  return `${linePath(upper)}${[...lower].reverse().map((p) => `L${xy(p)}`).join("")}Z`;
+/** One closed box per slot between two step lines. */
+export function stepBands(a: number[], b: number[], x: Scale, y: Scale): string {
+  return a.map((v, i) => `M${r(x(i))} ${r(y(v))}H${r(x(i + 1))}V${r(y(b[i]))}H${r(x(i))}Z`).join("");
 }
 
-/** A sparkline scaled to its own range, inset 2 px top and bottom. */
-export function sparkPath(values: number[], w: number, h: number): string {
-  const lo = Math.min(...values);
-  const span = Math.max(...values) - lo || 1;
-  return linePath(values.map((v, i) => [(i / (values.length - 1)) * w, h - 2 - ((v - lo) / span) * (h - 4)]));
-}
-
-/** The index of the evenly spaced slot nearest to a position. */
-export function nearestIndex(pos: number, start: number, end: number, count: number): number {
-  const i = Math.round(((pos - start) / (end - start)) * (count - 1));
-  return Math.max(0, Math.min(count - 1, i));
+/** The slot under a position, for `count` equal slots from start to end, clamped to the ends. */
+export function slotIndex(pos: number, start: number, end: number, count: number): number {
+  return Math.max(0, Math.min(count - 1, Math.floor(((pos - start) / (end - start)) * count)));
 }

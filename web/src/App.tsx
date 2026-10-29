@@ -1,37 +1,25 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { type Accuracy, type Decision, type GateId, type Initial, type Meta, paths, type TrackRecord as Track, useApi } from "./api";
-import { Bulletins } from "./components/Bulletins";
 import { DayStrip } from "./components/DayStrip";
-import { Dock } from "./components/Dock";
-import { DriftLadder } from "./components/DriftLadder";
-import { Entrance } from "./components/Entrance";
 import { Footer } from "./components/Footer";
 import { GatePresets } from "./components/GatePresets";
-import { GateSentence } from "./components/GateSentence";
 import { Header } from "./components/Header";
-import { LeadTimeChart } from "./components/LeadTimeChart";
-import { Ledger } from "./components/Ledger";
-import { MonthlyBias } from "./components/MonthlyBias";
-import { Provenance } from "./components/Provenance";
+import { Statement } from "./components/Statement";
+import { Ticket } from "./components/Ticket";
 import { TrackRecord } from "./components/TrackRecord";
 import { WorstDays } from "./components/WorstDays";
-import { hoursText, monthName, num, ukDay } from "./format";
+import { ukDay } from "./format";
 import { useMedia, useMotion } from "./hooks";
-import { dayFacts } from "./lib/decision";
-import { deliveryDays, gateTime, periodLabels } from "./lib/meta";
-import { nextGate, type View, viewFromSearch, viewSearch } from "./lib/view";
-import { countUp, EASE, gsap, jumpTo, keepPlace, MASK_PAD, registerGsap, sceneMoved, ScrollTrigger, SplitText, startSmoothScroll } from "./motion";
+import { dayFacts, worstLabel } from "./lib/decision";
+import { deliveryDays, gateName, gateTime, periodLabels } from "./lib/meta";
+import { type View, viewFromSearch, viewSearch } from "./lib/view";
+import { EASE, gsap, jumpTo, keepPlace, MASK_PAD, registerGsap, sceneMoved, ScrollTrigger, SplitText, startSmoothScroll } from "./motion";
 
 // The opening view when no prerendered answer exists (dev): the worst January day at the default gate.
 const OPENING: View = { day: "2026-01-28", gate: "epex_0920" };
 
 const noSubscription = () => () => {};
-
-const monthSpan = (rows: Accuracy["monthly"]) => {
-  const [a, b] = [rows[0].month, rows[rows.length - 1].month];
-  return `${monthName(a)} ${a.slice(0, 4)} to ${monthName(b)} ${b.slice(0, 4)}`;
-};
 
 export default function App({ initial }: { initial?: Initial }) {
   const [chosen, setChosen] = useState<View>();
@@ -48,8 +36,6 @@ export default function App({ initial }: { initial?: Initial }) {
   const record = useApi<Track>(paths.trackRecord).data;
   const motion = useMotion();
   const smooth = useMedia("(pointer: fine)") && motion;
-  // The pinned scene needs the height for the log and the whole chart; short screens (a phone held sideways) read it in flow.
-  const staged = useMedia("(min-height: 561px)") && motion;
   const pendingJump = useRef<string>(undefined);
   const ready = Boolean(meta && decision.data && accuracy.data && record);
   const hero = useRef<HTMLElement>(null);
@@ -79,7 +65,7 @@ export default function App({ initial }: { initial?: Initial }) {
     return () => document.removeEventListener("click", onClick);
   }, []);
 
-  // A worst-day shortcut jumps to the chart once that day has rendered and the scene has been rebuilt.
+  // A worst-day shortcut jumps to the ticket once that day has rendered.
   useEffect(() => {
     if (decision.data && pendingJump.current === decision.data.day && !decision.loading) {
       pendingJump.current = undefined;
@@ -88,27 +74,42 @@ export default function App({ initial }: { initial?: Initial }) {
   }, [decision.data, decision.loading]);
 
   useLayoutEffect(() => {
-    if (!motion) return;
+    if (!motion || !ready) return;
     registerGsap();
+    const once = (trigger: Element | string, start = "top 85%") => ({ trigger, start, once: true });
+    // A reveal that holds a control finishes as soon as the keyboard reaches it, so focus never lands on a faded control.
+    const reveals: [Element, gsap.core.Tween][] = [];
+    const onFocus = (e: FocusEvent) => reveals.forEach(([root, tween]) => root.contains(e.target as Node) && tween.progress(1));
     const ctx = gsap.context(() => {
-      document.querySelectorAll<HTMLElement>("section h2[data-split]").forEach((h) =>
+      const rise = (h: HTMLElement, scrollTrigger?: ScrollTrigger.Vars) =>
         SplitText.create(h, {
           type: "lines",
           mask: "lines",
-          linesClass: "split-line",
           autoSplit: true,
           onSplit: (self) => {
             gsap.set(self.masks, { ...MASK_PAD });
-            return gsap.from(self.lines, { yPercent: 120, duration: 1.3, ease: EASE, stagger: 0.1, scrollTrigger: { trigger: h, start: "top 85%", once: true } });
+            return gsap.from(self.lines, { yPercent: 115, duration: 0.8, ease: "expo.out", stagger: 0.08, scrollTrigger });
           },
-        }),
+        });
+      const h1 = document.getElementById("hero-title");
+      if (h1) rise(h1);
+      document.querySelectorAll<HTMLElement>("h2[data-split]").forEach((h) => rise(h, once(h, "top 88%")));
+      document.querySelectorAll(".sheet table").forEach((table) =>
+        reveals.push([table, gsap.from(table.querySelectorAll("tr"), { clipPath: "inset(0 100% 0 0)", duration: 0.35, ease: "power2.out", stagger: 0.05, clearProps: "clipPath", scrollTrigger: once(table) })]),
       );
-      document.querySelectorAll<HTMLElement>("[data-count]").forEach(countUp);
+      document.querySelectorAll(".sheet-split .part").forEach((part) => gsap.from(part.querySelectorAll(".meter"), { scaleX: 0, duration: 0.6, ease: EASE, stagger: 0.03, scrollTrigger: once(part) }));
+      const row = document.querySelector(".stub-row");
+      if (row) reveals.push([row, gsap.from(".stub-card", { x: 48, rotate: 2.5, opacity: 0, duration: 0.6, ease: EASE, stagger: 0.12, scrollTrigger: once(row, "top 80%") })]);
+      gsap.from(".stub-card .sc-bar span", { scaleX: 0, duration: 0.7, ease: EASE, stagger: 0.05, delay: 0.3, scrollTrigger: once(".stub-row", "top 80%") });
     });
-    return () => ctx.revert();
+    document.addEventListener("focusin", onFocus);
+    return () => {
+      document.removeEventListener("focusin", onFocus);
+      ctx.revert();
+    };
   }, [motion, ready]);
 
-  // Content above the pin can change height (an open disclosure, a new day's sentence); the pin must then start where the section now is.
+  // Content above the pin can change height (an open disclosure, a new gate's note); the pin must then start where the scene now is.
   useEffect(() => {
     const el = hero.current;
     if (!el || !motion) return;
@@ -143,49 +144,37 @@ export default function App({ initial }: { initial?: Initial }) {
   const period = periodLabels(meta);
   const month = period.month.split(" ")[0];
   const shownGate = gateTime(meta, d.gate);
-  const i = days.indexOf(view.day);
-  const step = (s: number) => {
-    if (days[i + s]) select({ day: days[i + s] });
-  };
+  const gate = meta.gates.find((g) => g.id === d.gate);
   return (
     <>
-      <a className="skip" href="#gate">
+      <a className="skip" href="#days">
         Skip to the day picker
       </a>
-      <Entrance motion={motion} />
       <Header />
-      <main id="main" className={loading ? "is-loading" : undefined}>
+      <main id="top" className={loading ? "is-loading" : undefined}>
         <section className="hero" id="gate" aria-labelledby="hero-title" ref={hero}>
-          <div className="hero-text">
-            <p className="eyebrow">GB day-ahead wind backtest</p>
-            <h1 id="hero-title" className="display">
-              The forecast you had <em>when the gate shut.</em>
-            </h1>
-            <Provenance meta={meta} month={period.month} />
+          <h1 id="hero-title">The forecast you bid&nbsp;on</h1>
+          <div className="hero-side">
+            <p className="lead">
+              Pick a {month} delivery day and an auction gate. The ticket holds the GB wind forecast you had when the auction closed. The next day, metered wind is stamped across it.
+            </p>
+            <div className="hero-controls">
+              <GatePresets gates={meta.gates} gate={view.gate} decision={d} onSelect={(g: GateId) => select({ gate: g })} />
+              <WorstDays
+                worst={acc.worst_days}
+                month={month}
+                gateTime={shownGate}
+                day={view.day}
+                onPick={(day) => {
+                  pendingJump.current = day;
+                  if (day === d.day) jumpTo("chart");
+                  else select({ day });
+                }}
+              />
+            </div>
           </div>
-          <DayStrip
-            days={days}
-            day={view.day}
-            daily={acc.daily}
-            worst={acc.worst_days.map((w) => w.day)}
-            span={period.delivery}
-            smooth={motion}
-            onSelect={(day) => select({ day })}
-          />
-          <div className="console" role="group" aria-label="Choose a gate">
-            <GatePresets gates={meta.gates} gate={view.gate} decision={d} onSelect={(gate: GateId) => select({ gate })} />
-            <WorstDays
-              worst={acc.worst_days}
-              day={view.day}
-              smooth={motion}
-              onPick={(day) => {
-                pendingJump.current = day;
-                if (day === d.day) jumpTo("chart");
-                else select({ day });
-              }}
-            />
-          </div>
-          <GateSentence decision={d} accuracy={acc} gateTime={shownGate} month={month} error={decision.error ?? accuracy.error} />
+          <DayStrip days={days} day={view.day} daily={acc.daily} worst={acc.worst_days.map((w) => w.day)} motion={motion} onSelect={(day) => select({ day })} />
+          <p className="stubs-note">Each stub is a delivery day. Its bar is the day's mean miss, forecast against metered wind.</p>
           <noscript>
             <p className="noscript">
               The day and gate controls need JavaScript. Without it, this page shows {ukDay(d.day)} at the {shownGate} gate.
@@ -193,57 +182,30 @@ export default function App({ initial }: { initial?: Initial }) {
           </noscript>
         </section>
 
-        <Bulletins
-          staged={staged}
-          smooth={smooth}
+        <Ticket
           decision={d}
+          auction={gate ? `${gateName(gate)} auction` : ""}
+          gateTime={shownGate}
+          worst={worstLabel(
+            acc.worst_days.findIndex((w) => w.day === d.day),
+            month,
+            shownGate,
+          )}
           hour={hour}
           margin={margin}
-          gateTime={shownGate}
           marginDays={meta.margin_window_days}
+          motion={motion}
+          smooth={smooth}
+          error={decision.error ?? accuracy.error}
           onHour={setHour}
           onMargin={() => setMargin((on) => !on)}
         />
 
-        <DriftLadder decision={d} hour={hour} onHour={setHour} />
+        <Statement accuracy={acc} gateTime={shownGate} delivery={period.delivery} decisions={period.decisions} month={period.month} />
 
-        <section className="accuracy" id="accuracy" aria-labelledby="accuracy-title">
-          <div className="wrap">
-            <p className="eyebrow">Accuracy</p>
-            <h2 id="accuracy-title" className="display" data-split>
-              The gap you carry, <em>in megawatts.</em>
-            </h2>
-            <p className="lede">
-              At the {shownGate} gate, delivery days {period.delivery}: {num(acc.headline.n)} hours, each compared with metered wind.
-            </p>
-            <Ledger headline={acc.headline} gateTime={shownGate} period={`Delivery days ${period.delivery} (decisions made ${period.decisions})`} />
-            <div className="acc-grid">
-              <figure className="panel">
-                <figcaption>
-                  <h3>The gap grows with lead time</h3>
-                  <p>
-                    Mean absolute error by hours ahead, every run published in the two days before delivery. Marked: the lead times the {shownGate} gate used for {ukDay(d.day)} ({hoursText(facts.h0)} to {hoursText(facts.h1)} h).
-                  </p>
-                </figcaption>
-                <LeadTimeChart rows={acc.by_lead_time} h0={facts.h0} h1={facts.h1} />
-              </figure>
-              <figure className="panel">
-                <figcaption>
-                  <h3>Above metered wind every month</h3>
-                  <p>
-                    Mean bias at this gate by calendar month, {monthSpan(acc.monthly)}. {month} here is the whole calendar month, so it differs a little from the ledger above, which counts delivery days {period.delivery}. Positive means the forecast ran above metered wind.
-                  </p>
-                </figcaption>
-                <MonthlyBias rows={acc.monthly} scored={meta.delivery_first.slice(0, 7)} />
-              </figure>
-            </div>
-          </div>
-        </section>
-
-        <TrackRecord record={record} meta={meta} gate={d.gate} delivery={period.delivery} month={month} />
+        <TrackRecord record={record} meta={meta} delivery={period.delivery} month={period.month} />
       </main>
       <Footer meta={meta} month={period.month} />
-      <Dock day={view.day} gateTime={gateTime(meta, view.gate)} canPrev={i > 0} canNext={i < days.length - 1} onStep={step} onCycleGate={() => select({ gate: nextGate(view.gate) })} />
     </>
   );
 }

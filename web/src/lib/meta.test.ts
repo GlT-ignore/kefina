@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { Meta, TrackRecord } from "../api";
-import { bucketCovers, bucketLabel } from "./accuracy";
+import { bucketLabel } from "./accuracy";
 import { calibrationLabels, deliveryDays, gateName, periodLabels } from "./meta";
-import { nextGate, viewFromSearch, viewSearch } from "./view";
+import { viewFromSearch, viewSearch } from "./view";
 
 const meta = { delivery_first: "2026-01-02", delivery_last: "2026-02-01" } as Meta;
 const days = deliveryDays(meta.delivery_first, meta.delivery_last);
@@ -35,19 +35,11 @@ describe("view in the URL", () => {
     expect(viewFromSearch("?day=2025-12-01&gate=nope", days, opening)).toEqual(opening);
     expect(viewSearch(opening)).toBe("?day=2026-01-28&gate=epex_0920");
   });
-
-  it("cycles the gates", () => {
-    expect(nextGate("epex_1530")).toBe("epex_0920");
-  });
 });
 
 describe("lead-time buckets", () => {
-  it("labels and matches buckets against the hours ahead", () => {
+  it("labels buckets", () => {
     expect(bucketLabel("12-18h")).toBe("12 to 18 h");
     expect(bucketLabel("48h+")).toBe("48 h and more");
-    expect(bucketCovers("12-18h", 16.5, 39.5)).toBe(true);
-    expect(bucketCovers("0-6h", 16.5, 39.5)).toBe(false);
-    expect(bucketCovers("48h+", 16.5, 39.5)).toBe(false);
-    expect(bucketCovers("48h+", 40, 63)).toBe(true);
   });
 });

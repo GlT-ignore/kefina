@@ -5,11 +5,11 @@ import Lenis from "lenis";
 
 export { gsap, ScrollTrigger, SplitText };
 
-// One motion character for the whole page: smooth and ceremonial.
-export const EASE = "expo.out";
+export const EASE = "power3.out";
 
-// SplitText masks clip at the line box; at tight line-heights ascenders, descenders and italic overhangs reach past it.
-export const MASK_PAD = { padding: "0.14em 0.08em 0.16em", margin: "-0.14em -0.08em -0.16em" };
+// SplitText masks clip at the line box, and at tight line-heights descenders reach past it. Only the bottom is padded:
+// a negative top margin would collapse into the line above's negative bottom margin and push the heading down.
+export const MASK_PAD = { paddingBottom: "0.16em", marginBottom: "-0.16em" };
 
 let registered = false;
 export function registerGsap(): void {
@@ -38,7 +38,7 @@ export function startSmoothScroll(): () => void {
   };
 }
 
-/** The pinned scene's trigger, so "go to the chart" can land where the scene releases the live chart. */
+/** The pinned scene's trigger, so "go to the ticket" can land where the print has finished. */
 export function setScene(trigger: ScrollTrigger | undefined): void {
   scene = trigger;
 }
@@ -62,28 +62,34 @@ export function scrollToY(y: number, smooth: boolean): void {
   }
 }
 
+/** Where an element sits in the page, ignoring transforms: before the tear the ticket is drawn shifted under the printer head. */
+function layoutTop(el: HTMLElement): number {
+  let y = 0;
+  for (let n: Element | null = el; n instanceof HTMLElement; n = n.offsetParent) y += n.offsetTop;
+  return y;
+}
+
 export function jumpTo(id: string): void {
   if (id === "chart" && scene) return scrollToY(scene.end, true);
   const el = document.getElementById(id);
   if (!el) return;
-  const head = document.querySelector<HTMLElement>(".head")?.offsetHeight ?? 0;
-  const dock = parseFloat(getComputedStyle(document.documentElement).scrollPaddingBottom) || 0;
-  // A chart taller than the screen (a phone held sideways) lands on its plot rather than its title.
-  const tall = id === "chart" && el.offsetHeight > window.innerHeight - head - dock;
-  const box = (tall && el.querySelector(".plot")) || el.closest(".pin-spacer") || el;
-  scrollToY(box.getBoundingClientRect().top + window.scrollY - head - 8, true);
+  // An unpinned ticket that does not fit the screen down to its chart (a phone held sideways) lands on the chart instead.
+  const plot = (id === "chart" || id === "ticket") && !scene ? document.querySelector<HTMLElement>("#chart .chart-box") : null;
+  if (plot && layoutTop(plot) + plot.offsetHeight - layoutTop(el) > window.innerHeight) return scrollToY(layoutTop(plot) - 8, true);
+  scrollToY(topOf(el) - 8, true);
 }
 
-/** Where the reader is, in terms that survive re-measuring: progress through the bulletin scene, or a landmark and its offset. */
+/** Where the reader is, in terms that survive re-measuring: progress through the ticket scene, or a landmark and its offset. */
 type Place = { progress: number } | { index: number; offset: number };
 
-const landmarks = () => [...document.querySelectorAll<HTMLElement>("main section, main h2, main h3, footer")].filter((el) => !el.parentElement?.closest(".is-staged"));
+// The same list with or without the pin, so a landmark's index survives the pin coming and going across 960 px.
+const landmarks = () => [...document.querySelectorAll<HTMLElement>("main section, main h2, main h3, footer")];
 // A pinned section moves with its pin; its spacer holds its place in the page.
 const topOf = (el: Element) => (el.closest(".pin-spacer") ?? el).getBoundingClientRect().top + window.scrollY;
 
 function sceneRange(): [number, number] | undefined {
   if (scene) return [scene.start, scene.end];
-  const sec = document.getElementById("bulletins");
+  const sec = document.getElementById("ticket");
   if (!sec) return undefined;
   const top = topOf(sec);
   return [top, top + Math.max(1, sec.offsetHeight - window.innerHeight)];
@@ -115,12 +121,18 @@ function placeY(place: Place): number | undefined {
  */
 export function keepPlace(): () => void {
   registerGsap();
-  const KEY = "readback-place";
+  const KEY = "tearsheet-place";
   const SETTLE = 1000;
   let place: Place | undefined;
   let settleUntil = 0;
+  let frame = 0;
+  // Recorded as the page moves, not when it stops: a resize can come while a smooth scroll is still gliding.
   const record = () => {
+    frame = 0;
     if (performance.now() > settleUntil) place = readPlace();
+  };
+  const onScroll = () => {
+    frame ||= requestAnimationFrame(record);
   };
   const restore = () => {
     const y = performance.now() <= settleUntil && place ? placeY(place) : undefined;
@@ -156,43 +168,16 @@ export function keepPlace(): () => void {
     restore();
   } else record();
 
-  ScrollTrigger.addEventListener("scrollEnd", record);
+  window.addEventListener("scroll", onScroll, { passive: true });
   ScrollTrigger.addEventListener("refresh", restore);
   window.addEventListener("resize", resized);
   window.addEventListener("pagehide", save);
   return () => {
-    ScrollTrigger.removeEventListener("scrollEnd", record);
+    window.removeEventListener("scroll", onScroll);
+    cancelAnimationFrame(frame);
     ScrollTrigger.removeEventListener("refresh", restore);
     window.removeEventListener("resize", resized);
     window.removeEventListener("pagehide", save);
     history.scrollRestoration = restoration;
   };
-}
-
-/** Counts a number up from zero the first time it scrolls into view. */
-export function countUp(el: HTMLElement): void {
-  const text = el.dataset.count ?? "";
-  const target = Number(text.replace(/[^\d.]/g, ""));
-  const node = el.firstChild;
-  if (!target || !node) return;
-  const sign = /^[+-]/.exec(text)?.[0] ?? "";
-  const proxy = { v: 0 };
-  // React may swap in a new number mid-count (a new gate), so always settle on the latest one.
-  const settle = () => (node.nodeValue = el.dataset.count ?? text);
-  gsap.to(proxy, {
-    v: target,
-    duration: 1.6,
-    ease: EASE,
-    scrollTrigger: { trigger: el, start: "top 90%", once: true },
-    onUpdate() {
-      if (el.dataset.count !== text) {
-        this.kill();
-        settle();
-        return;
-      }
-      node.nodeValue = sign + Math.round(proxy.v).toLocaleString("en-US");
-    },
-    onComplete: settle,
-    onInterrupt: settle,
-  });
 }

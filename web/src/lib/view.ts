@@ -18,7 +18,3 @@ export function viewFromSearch(search: string, days: string[], fallback: View): 
 export function viewSearch(v: View): string {
   return `?${new URLSearchParams({ day: v.day, gate: v.gate })}`;
 }
-
-export function nextGate(gate: GateId): GateId {
-  return GATES[(GATES.indexOf(gate) + 1) % GATES.length];
-}

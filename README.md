@@ -1,4 +1,4 @@
-# Readback: GB wind forecast at the gate
+# Tearsheet: GB wind forecast at the gate
 
 A pilot for a GB energy supplier's day-ahead desk. It shows the national wind forecast the desk actually had when each day-ahead auction closed, next to metered wind, and how far those forecasts were off, for purchase decisions made in January 2026.
 
@@ -63,8 +63,8 @@ data/
   windows.json         calibration result behind the frozen windows
 tests/             pytest: rules on hand-checkable cases, pinned January numbers, API contract
 web/
-  src/App.tsx          the page: gate console, bulletin log, chart, drift, accuracy, track record
-  src/components/      one component per view (DayStrip, Bulletins, ForecastChart, DriftLadder, Ledger, TrackRecord, ...)
+  src/App.tsx          the page: gate picker, day strip, ticket with run log and chart, accuracy statement, track record
+  src/components/      one component per view (GatePresets, DayStrip, Ticket, ForecastChart, Statement, TrackRecord, ...)
   src/lib/             pure helpers behind the views (run labels, chart scales and paths), with Vitest tests
   src/api.ts           typed API client mirroring backend/models.py
   src/format.ts        UK time and number formatting
@@ -113,7 +113,7 @@ Gates: `epex_0920` (EPEX hourly, default), `n2ex_0950` (N2EX hourly), `epex_1530
 
 ## Use of AI tools
 
-I used AI coding assistants (Claude Code) throughout this project: to research the Elexon datasets and GB auction rules, to run the first analysis on real data, to draft the plan, to build two design directions as working prototypes (one was chosen and ported), and to draft most of the code and tests. Every rule has a test, every headline number is pinned against an independent analysis script, and the full set of checks above runs in CI.
+I used AI coding assistants (Claude Code) throughout this project: to research the Elexon datasets and GB auction rules, to run the first analysis on real data, to draft the plan, to build design directions as working prototypes over two rounds (I picked one each round; the second pick replaced the first and was ported), and to draft most of the code and tests. Every rule has a test, every headline number is pinned against an independent analysis script, and the full set of checks above runs in CI.
 
 ## Data attribution
 

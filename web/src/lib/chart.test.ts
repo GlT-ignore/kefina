@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { bandPath, linear, linePath, mwAxis, nearestIndex, sparkPath } from "./chart";
+import { linear, mwAxis, slotIndex, stepBands, stepPath } from "./chart";
 
 describe("scales", () => {
   it("maps a domain onto pixels, inverted for y", () => {
@@ -14,20 +14,26 @@ describe("scales", () => {
     expect(mwAxis([-1500, 5000])).toEqual({ bottom: -2000, top: 6000, ticks: [-2000, 0, 2000, 4000, 6000] });
   });
 
-  it("finds the nearest slot and clamps outside the plot", () => {
-    expect(nearestIndex(55, 10, 110, 5)).toBe(2);
-    expect(nearestIndex(-40, 10, 110, 5)).toBe(0);
-    expect(nearestIndex(400, 10, 110, 5)).toBe(4);
+  it("finds the slot under a position and clamps outside the plot", () => {
+    expect(slotIndex(10, 10, 110, 4)).toBe(0);
+    expect(slotIndex(59, 10, 110, 4)).toBe(1);
+    expect(slotIndex(60, 10, 110, 4)).toBe(2);
+    expect(slotIndex(-40, 10, 110, 4)).toBe(0);
+    expect(slotIndex(110, 10, 110, 4)).toBe(3);
   });
 });
 
-describe("paths", () => {
-  it("draws lines and the band between two lines", () => {
-    expect(linePath([[0, 10], [5, 0]])).toBe("M0.0 10.0L5.0 0.0");
-    expect(bandPath([[0, 1], [2, 1]], [[0, 3], [2, 4]])).toBe("M0.0 1.0L2.0 1.0L2.0 4.0L0.0 3.0Z");
+describe("step paths", () => {
+  const x = (i: number) => i * 10;
+  const y = (v: number) => 100 - v;
+
+  it("holds each value across its slot and lifts the pen over a gap", () => {
+    expect(stepPath([10, 20], x, y)).toBe("M0.0 90.0H10.0V80.0H20.0");
+    expect(stepPath([10, undefined, 30], x, y)).toBe("M0.0 90.0H10.0M20.0 70.0H30.0");
+    expect(stepPath([undefined], x, y)).toBe("");
   });
 
-  it("scales a sparkline to its own range", () => {
-    expect(sparkPath([10, 20], 100, 24)).toBe("M0.0 22.0L100.0 2.0");
+  it("boxes the gap between two step lines, slot by slot", () => {
+    expect(stepBands([50, 40], [20, 45], x, y)).toBe("M0.0 50.0H10.0V80.0H0.0ZM10.0 60.0H20.0V55.0H10.0Z");
   });
 });
