@@ -56,7 +56,7 @@ const SEEN = "tearsheet-seen";
 
 function seen(): boolean {
   try {
-    return localStorage.getItem(SEEN) === "1";
+    return sessionStorage.getItem(SEEN) === "1";
   } catch {
     return false;
   }
@@ -64,7 +64,7 @@ function seen(): boolean {
 
 function markSeen(): void {
   try {
-    localStorage.setItem(SEEN, "1");
+    sessionStorage.setItem(SEEN, "1");
   } catch {
     // Storage can be refused in private windows; the print then plays again next visit.
   }
